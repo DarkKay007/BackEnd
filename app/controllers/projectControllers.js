@@ -1,9 +1,22 @@
 import { collection as projectCollection, ObjectId } from '../models/projectModels.js';
 
-// Obtener todos los proyectos
+// Obtener todos los proyectos del usuario
 const getAllProjects = async (req, res) => {
   try {
-    const projects = await projectCollection.find().toArray();
+    const user = req.user;
+    let projects;
+
+    if (user.rol === 'Administrador') {
+      projects = await projectCollection.find().toArray();
+    } else {
+      projects = await projectCollection.find({
+        $or: [
+          { assignedTo: user._id.toString() },
+          { createdBy: user._id.toString() },
+        ],
+      }).toArray();
+    }
+
     res.json(projects);
   } catch (error) {
     console.error(`Error getting projects: ${error}`);
@@ -17,9 +30,16 @@ const getProjectById = async (req, res) => {
 
   try {
     const project = await projectCollection.findOne({ _id: new ObjectId(id) });
+
     if (!project) {
       return res.status(404).send('Project not found');
     }
+
+    // Verificar permisos
+    if (req.user.rol !== 'Administrador' && project.createdBy !== req.user._id.toString() && !project.assignedTo.includes(req.user._id.toString())) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
     res.json(project);
   } catch (error) {
     console.error(`Error getting project by ID: ${error}`);
@@ -32,8 +52,13 @@ const createProject = async (req, res) => {
   const projectData = req.body;
 
   try {
+    projectData.createdBy = req.user._id.toString();
     const result = await projectCollection.insertOne(projectData);
-    res.status(201).json(result.ops[0]);
+
+    // Acceder correctamente al proyecto insertado
+    const createdProject = await projectCollection.findOne({ _id: result.insertedId });
+
+    res.status(201).json(createdProject);
   } catch (error) {
     console.error(`Error creating project: ${error}`);
     res.status(500).send('Internal Server Error');
@@ -46,10 +71,18 @@ const updateProject = async (req, res) => {
   const updatedProjectData = req.body;
 
   try {
-    const result = await projectCollection.updateOne({ _id: new ObjectId(id) }, { $set: updatedProjectData });
-    if (result.modifiedCount === 0) {
+    const project = await projectCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!project) {
       return res.status(404).send('Project not found');
     }
+
+    // Verificar permisos
+    if (req.user.rol !== 'Administrador' && project.createdBy !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    await projectCollection.updateOne({ _id: new ObjectId(id) }, { $set: updatedProjectData });
     res.status(200).send('Project updated successfully');
   } catch (error) {
     console.error(`Error updating project: ${error}`);
@@ -62,10 +95,18 @@ const deleteProject = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await projectCollection.deleteOne({ _id: new ObjectId(id) });
-    if (result.deletedCount === 0) {
+    const project = await projectCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!project) {
       return res.status(404).send('Project not found');
     }
+
+    // Verificar permisos
+    if (req.user.rol !== 'Administrador' && project.createdBy !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    await projectCollection.deleteOne({ _id: new ObjectId(id) });
     res.status(200).send('Project deleted successfully');
   } catch (error) {
     console.error(`Error deleting project: ${error}`);
@@ -73,4 +114,28 @@ const deleteProject = async (req, res) => {
   }
 };
 
-export { getAllProjects, getProjectById, createProject, updateProject, deleteProject };
+// Asignar usuarios a un proyecto
+const assignUsersToProject = async (req, res) => {
+  const { id } = req.params;
+  const { userIds } = req.body;
+
+  try {
+    const project = await projectCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!project) {
+      return res.status(404).send('Project not found');
+    }
+
+    await projectCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { assignedTo: userIds } }
+    );
+
+    res.status(200).send('Users assigned to project successfully');
+  } catch (error) {
+    console.error(`Error assigning users to project: ${error}`);
+    res.status(500).send('Internal Server Error');
+  }
+};
+
+export { getAllProjects, getProjectById, createProject, updateProject, deleteProject, assignUsersToProject };

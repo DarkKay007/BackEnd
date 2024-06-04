@@ -5,7 +5,15 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-async function login (req, res) {
+const generateToken = (user) => {
+  return jwt.sign(
+    { id: user._id, rol: user.rol },
+    process.env.JWT_SECRET,
+    { expiresIn: '5h' }
+  );
+};
+
+async function login(req, res) {
   const { user, password } = req.body;
 
   try {
@@ -19,26 +27,21 @@ async function login (req, res) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ id: existingUser._id, rol: existingUser.rol }, process.env.JWT_SECRET, {
-      expiresIn: '1h', // Token expiration time
-    });
-
+    const token = generateToken(existingUser);
     res.json({ token });
   } catch (error) {
     console.error('Error logging in:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-};
+}
 
-
-// Función de registro
 async function register(req, res) {
-  const { user, password, email,name } = req.body;
+  const { user, password, email, name } = req.body;
 
   try {
     const existingUser = await collection.findOne({ user });
     if (existingUser) {
-      return res.status(409).send('User already exists');
+      return res.status(409).json({ message: 'User already exists' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -46,27 +49,26 @@ async function register(req, res) {
     const newUser = {
       user,
       name,
-      password: hashedPassword,
       email,
-      rol: 'Usuario', // Define el rol por defecto
+      password: hashedPassword,
+      rol: 'Usuario', // Rol por defecto
       date_create: new Date()
     };
 
     const result = await collection.insertOne(newUser);
-    console.log("User created:", result);
-
     const token = generateToken(newUser);
+
     res.status(201).json({ token });
   } catch (error) {
     console.error(`Error registering: ${error}`);
-    res.status(500).send(`Internal Server Error: ${error.message}`);
+    res.status(500).json({ message: 'Internal server error' });
   }
 }
-// Función para cerrar sesión
+
 async function logoutUser(req, res) {
-  // Eliminar el token de la sesión
+  // Eliminar el token del cliente
   res.clearCookie('token');
-  res.redirect('/'); // Redireccionar al usuario a la página de inicio
+  res.json({ message: 'Logged out successfully' });
 }
 
-export { login, register,logoutUser };
+export { login, register, logoutUser };
