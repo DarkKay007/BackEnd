@@ -5,10 +5,24 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+
+
 const generateToken = (user) => {
+  // Verifica que user tiene todos los campos necesarios
+  if (!user || !user._id || !user.rol || !user.user || !user.email || !user.name) {
+    throw new Error("User object is missing required properties");
+  }
+
+  // Genera y retorna el token
   return jwt.sign(
-    { id: user._id, rol: user.rol },
-    process.env.JWT_SECRET,
+    { 
+      id: user._id, 
+      rol: user.rol,
+      user: user.user,
+      email: user.email,
+      name: user.name 
+    },
+    process.env.JWT_SECRET, // Asegúrate de que esta variable de entorno esté configurada
     { expiresIn: '5h' }
   );
 };
