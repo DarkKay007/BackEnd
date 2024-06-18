@@ -99,12 +99,12 @@ async function getUserById(userId) {
   return user;
 }
 
-// Función para actualizar los datos de un usuario
 async function updateUserOne(userId, updatedUserData) {
+  if (updatedUserData.password) {
+    updatedUserData.password = await bcrypt.hash(updatedUserData.password, 10);
+  }
   await collection.updateOne({ _id: new ObjectId(userId) }, { $set: updatedUserData });
 }
-
-
 
 export {
   createUser,
