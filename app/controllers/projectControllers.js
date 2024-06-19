@@ -78,7 +78,7 @@ const updateProject = async (req, res) => {
     }
 
     // Verificar permisos
-    if (req.user.rol !== 'Administrador' && project.createdBy !== req.user._id.toString()) {
+    if (!req.user || req.user.rol!== 'Administrador' && project.createdBy!== req.user._id.toString()) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
