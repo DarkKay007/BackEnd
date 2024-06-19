@@ -67,7 +67,7 @@ const createProject = async (req, res) => {
 
 const updateProject = async (req, res) => {
   const { id } = req.params;
-  const updatedProjectData = req.body;
+  const updatedProjectData = { ...req.body };
 
   try {
     console.log(`Received update request for project ID: ${id}`);
@@ -86,6 +86,9 @@ const updateProject = async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
+    // Eliminar el campo _id del objeto de datos actualizado
+    delete updatedProjectData._id;
+
     const updateResult = await projectCollection.updateOne(
       { _id: new ObjectId(id) },
       { $set: updatedProjectData }
@@ -102,6 +105,7 @@ const updateProject = async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 };
+
 
 
 // Eliminar un proyecto
