@@ -135,7 +135,7 @@ const deleteProject = async (req, res) => {
 // Asignar usuarios a un proyecto
 const assignUsersToProject = async (req, res) => {
   const { id } = req.params;
-  const { userIds } = req.body;
+  const { userIds, action } = req.body; // added action parameter
 
   try {
     const project = await projectCollection.findOne({ _id: new ObjectId(id) });
@@ -144,16 +144,25 @@ const assignUsersToProject = async (req, res) => {
       return res.status(404).send('Project not found');
     }
 
-    await projectCollection.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: { assignedTo: userIds } }
-    );
+    if (action === 'assign') {
+      await projectCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $addToSet: { assignedTo: { $each: userIds } } }
+      );
+    } else if (action === 'unassign') {
+      await projectCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $pullAll: { assignedTo: userIds } }
+      );
+    } else {
+      return res.status(400).send('Invalid action');
+    }
 
-    res.status(200).send('Users assigned to project successfully');
+    res.status(200).send('Users assigned/unassigned to project successfully');
   } catch (error) {
-    console.error(`Error assigning users to project: ${error}`);
+    console.error(`Error assigning/unassigning users to project: ${error}`);
     res.status(500).send('Internal Server Error');
   }
-};
+}
 
 export { getAllProjects, getProjectById, createProject, updateProject, deleteProject, assignUsersToProject };
